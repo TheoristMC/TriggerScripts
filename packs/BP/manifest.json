@@ -1,0 +1,34 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "TriggerScripts (BP)",
+    "description": "Implements scripts that can only be triggered.",
+    "uuid": "a67f4500-d0ba-4f80-bef2-8c18251ddf4b",
+    "min_engine_version": [1, 21, 0],
+    "version": [1, 0, 0]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "db99b5c3-4157-4530-88be-e686dd3b04f9",
+      "version": [1, 0, 0]
+    },
+    {
+      "type": "script",
+      "uuid": "556cdfd4-35e9-4261-ae14-1b7d96af1427",
+      "language": "javascript",
+      "entry": "index.js",
+      "version": [1, 0, 0]
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.5.0"
+    },
+    {
+      "module_name": "@minecraft/server-ui",
+      "version": "2.0.0"
+    }
+  ]
+}

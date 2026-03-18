@@ -1,0 +1,35 @@
+{
+	"$schema": "https://raw.githubusercontent.com/Bedrock-OSS/regolith-schemas/main/config/v1.7.json",
+	"author": "Theorist",
+	"name": "TriggerScripts",
+	"packs": {
+		"behaviorPack": "./packs/BP",
+		"resourcePack": "./packs/RP"
+	},
+	"regolith": {
+		"dataPath": "./packs/data",
+		"filterDefinitions": {
+			"ts_transpiler": {
+				"runWith": "nodejs",
+				"script": "../TS-Transpiler/index.js"
+			}
+		},
+		"formatVersion": "1.7.0",
+		"profiles": {
+			"default": {
+				"export": {
+					"build": "standard",
+					"readOnly": false,
+					"target": "development",
+					"bpName": "project.name+' BP'",
+					"rpName": "project.name+' RP'"
+				},
+				"filters": [
+					{
+						"filter": "ts_transpiler"
+					}
+				]
+			}
+		}
+	}
+}
