@@ -4,6 +4,21 @@ TriggerScripts is originally from a game called [Worlds FRVR](https://worlds.frv
 
 This can range from adding effects, damaging a player, and more!
 
+[Documentation](DOCS.md)
+
+## Roadmap
+
+Priority follows hierarchy:
+
+- Documentation
+- Implement a better user-interface when typing a code.
+- Loops (language)
+- Objects (language)
+- Arrays (language)
+- Type Conversion (language)
+- Better error messages (community feedback)
+- Optimize language code readability and performance.
+
 ## Contributing
 
-As of now, you cannot contribute as this project uses a local filter that transpiles TS to JS—which is not available to public currently.
+As of now, you cannot *easily* contribute as this project uses a local filter that transpiles TS to JS—which is not available to public currently.
