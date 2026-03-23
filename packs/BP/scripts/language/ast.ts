@@ -8,6 +8,8 @@ type NodeTypes =
   | "FUNCTIONDECLARATION"
   | "RETURNSTATEMENT"
   // EXPRESSIONS
+  | "INDEXEXP"
+  | "ARRAYLITERAL"
   | "FUNCTIONCALL"
   | "STRINGLITERAL"
   | "EQUALITYEXP"
@@ -60,9 +62,20 @@ interface FunctionCall extends Expression {
   args: Expression[];
 }
 
+interface ArrayLiteral extends Expression {
+  type: "ARRAYLITERAL";
+  elements: Expression[];
+}
+
 interface StringLiteral extends Expression {
   type: "STRINGLITERAL";
   value: string;
+}
+
+interface IndexExpression extends Expression {
+  type: "INDEXEXP";
+  array: Expression;
+  index: Expression;
 }
 
 interface AssignmentExpression extends Expression {
@@ -128,4 +141,6 @@ export {
   LogicalExpression,
   EqualityExpression,
   FunctionCall,
+  ArrayLiteral,
+  IndexExpression,
 };

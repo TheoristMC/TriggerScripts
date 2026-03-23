@@ -15,12 +15,14 @@ import {
   FunctionDeclaration,
   FunctionCall,
   ReturnStatement,
+  ArrayLiteral,
+  IndexExpression,
 } from "./ast";
 
 import { Tokenize, Token, TokenType } from "./lexer";
 
-function assertNever(x: never): never {
-  throw new Error(`Unexpected value: ${JSON.stringify(x)}`);
+function assertNever(x: never, err: string): never {
+  throw new Error(`${err}: ${JSON.stringify(x)}`);
 }
 
 class Parser {
@@ -49,7 +51,8 @@ class Parser {
   }
 
   private peekToken(step: number = 1): Token {
-    return this.tokens[this.pos + step];
+    const token = this.tokens[this.pos + step];
+    return token ?? { type: TokenType.EOF };
   }
 
   // EXPRESSIONS (order matter)
@@ -63,10 +66,6 @@ class Parser {
 
     if (this.currentToken.type === TokenType.EQUALS) {
       this.eatToken();
-
-      if (left.type !== "IDENTIFIER") {
-        throw new Error("Invalid assignment target.");
-      }
 
       const value = this.parseAssignmentExp();
 
@@ -209,7 +208,7 @@ class Parser {
       } as UnaryExpression;
     }
 
-    return this.parseFuncCallMember();
+    return this.parseCallMember();
   }
 
   private parseFuncCall(caller: Expression): Expression {
@@ -227,11 +226,29 @@ class Parser {
     return { type: "FUNCTIONCALL", caller, args } as FunctionCall;
   }
 
-  private parseFuncCallMember(): Expression {
+  private parseArrCall(caller: Expression): Expression {
+    this.eatToken(); // Eat '['
+
+    const index = this.parseExpression();
+
+    this.expectToken(TokenType.RBRACKET, "Expected ']'");
+
+    return {
+      type: "INDEXEXP",
+      array: caller,
+      index,
+    } as IndexExpression;
+  }
+
+  private parseCallMember(): Expression {
     let member = this.parsePrimaryExp();
 
-    while (this.currentToken.type === TokenType.LPAREN) {
-      member = this.parseFuncCall(member);
+    while (true) {
+      if (this.currentToken.type === TokenType.LPAREN) {
+        member = this.parseFuncCall(member);
+      } else if (this.currentToken.type === TokenType.LBRACKET) {
+        member = this.parseArrCall(member);
+      } else break;
     }
 
     return member;
@@ -255,11 +272,35 @@ class Parser {
         this.expectToken(TokenType.RPAREN, "Expected ')'");
         return value;
       }
+      case TokenType.LBRACKET:
+        return this.parseArrayLiteral();
       case TokenType.EOF:
         throw new Error("Unexpected end of input.");
       default:
-        return assertNever(token.type as never);
+        return assertNever(token.type as never, "Unexpected value on 'parsePrimaryExp'");
     }
+  }
+
+  private parseArrayLiteral(): Expression {
+    const elements = new Array<Expression>();
+
+    while (this.currentToken.type !== TokenType.RBRACKET) {
+      elements.push(this.parseExpression());
+
+      if (this.currentToken.type === TokenType.COMMA) {
+        if (this.peekToken().type === TokenType.RBRACKET)
+          throw new Error("Expected an expression after a comma.");
+
+        this.eatToken();
+      }
+    }
+
+    this.expectToken(TokenType.RBRACKET, "Expected ']'");
+
+    return {
+      type: "ARRAYLITERAL",
+      elements,
+    } as ArrayLiteral;
   }
 
   // STATEMENTS (order doesn't matter)

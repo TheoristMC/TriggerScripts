@@ -13,11 +13,11 @@ Priority follows hierarchy:
 - Documentation
 - Implement a better user-interface when typing a code.
 - Loops (language)
-- Objects (language)
-- Arrays (language)
+- ~~Arrays (language)~~
 - Type Conversion (language)
 - Better error messages (community feedback)
 - Optimize language code readability and performance.
+<!-- - Objects (language) -->
 
 ## Contributing
 

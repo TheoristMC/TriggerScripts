@@ -8,6 +8,7 @@ type ValueType =
   | "STRING"
   | "FUNCTION"
   | "NATIVEFUNCTION"
+  | "ARRAY"
   | "RETURN";
 
 interface RuntimeValue {
@@ -51,6 +52,11 @@ interface ReturnThrow extends RuntimeValue {
   value: RuntimeValue;
 }
 
+interface ArrayValue extends RuntimeValue {
+  type: "ARRAY";
+  value: RuntimeValue[];
+}
+
 function macroNull(): NullValue {
   return { type: "NULL", value: null } as NullValue;
 }
@@ -83,6 +89,7 @@ export {
   FunctionValue,
   NativeFunctionValue,
   ReturnThrow,
+  ArrayValue,
 };
 
 export { macroNull, macroNumber, macroBoolean, macroString, macroNativeFunc };

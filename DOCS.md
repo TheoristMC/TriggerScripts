@@ -109,6 +109,20 @@ if (len(str) == 8) {
 }
 ```
 
+## Creating Arrays
+
+Arrays are denoted by brackets(`[]`) like in JavaScript and multiple values are seperated by a comma.
+
+> At the moment, there are no built-in functions for arrays. It will be added in the future.
+
+### Example:
+```js
+var x = [10, 'dog', true, null];
+x[1] = 'cat'
+
+chatBroadcast(x[1]) // cat
+```
+
 ## Questions
 
 - Is this the final product?

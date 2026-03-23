@@ -10,9 +10,11 @@ import {
   ReturnThrow,
   NativeFunctionValue,
   macroBoolean,
+  ArrayValue,
 } from "./values";
 
 import {
+  ArrayLiteral,
   AssignmentExpression,
   BinaryExpression,
   EqualityExpression,
@@ -20,6 +22,7 @@ import {
   FunctionDeclaration,
   Identifier,
   IfStatement,
+  IndexExpression,
   LogicalExpression,
   Node,
   NumericLiteral,
@@ -66,7 +69,10 @@ class Interpreter {
       case "*":
         return macroNumber(leftValue * rightValue);
       default:
-        return assertNever(operator as never);
+        return assertNever(
+          operator as never,
+          "Unexpected value on 'evaluateBinaryExpNum'",
+        );
     }
   }
 
@@ -84,7 +90,10 @@ class Interpreter {
       case "-":
         return macroString(leftValue.replaceAll(rightValue, ""));
       default:
-        return assertNever(operator as never);
+        return assertNever(
+          operator as never,
+          "Unexpected value on 'evaluateBinaryExpStr'",
+        );
     }
   }
 
@@ -106,7 +115,7 @@ class Interpreter {
       case ">=":
         return macroBoolean(leftValue >= rightValue);
       default:
-        return assertNever(operator as never);
+        return macroBoolean(false);
     }
   }
 
@@ -116,51 +125,45 @@ class Interpreter {
   ): RuntimeValue {
     const nodeLeft = this.evaluate(node.left, scope);
     const nodeRight = this.evaluate(node.right, scope);
+    const operator = node.operator;
+    const leftType = nodeLeft.type;
+    const rightType = nodeRight.type;
 
     // Comparison (higher precedence)
-    if (
-      node.operator === "<" ||
-      node.operator === ">" ||
-      node.operator === "<=" ||
-      node.operator === ">="
-    ) {
-      if (nodeLeft.type !== "NUMBER" || nodeRight.type !== "NUMBER")
-        throw new Error("Comparison operation is only for numbers.");
-
-      return this.evaluateComparisonExp(
-        nodeLeft as NumberValue,
-        nodeRight as NumberValue,
-        node.operator,
-      );
-    }
-
-    // Numbers
-    if (nodeLeft.type === "NUMBER" && nodeRight.type === "NUMBER") {
+    if (leftType === "NUMBER" && rightType === "NUMBER") {
+      if (
+        operator === "<" ||
+        operator === ">" ||
+        operator === "<=" ||
+        operator === ">="
+      ) {
+        return this.evaluateComparisonExp(
+          nodeLeft as NumberValue,
+          nodeRight as NumberValue,
+          operator,
+        );
+      }
+      // Numeric operations
       return this.evaluateBinaryExpNum(
         nodeLeft as NumberValue,
         nodeRight as NumberValue,
-        node.operator,
+        operator,
       );
     }
 
     // Strings
-    if (nodeLeft.type === "STRING" && nodeRight.type === "STRING") {
+    if (leftType === "STRING" && rightType === "STRING") {
       return this.evaluateBinaryExpStr(
         nodeLeft as StringValue,
         nodeRight as StringValue,
-        node.operator,
+        operator,
       );
     }
 
     // Mixed Types Addition
-    if (
-      nodeLeft.type === "STRING" &&
-      nodeRight.type === "NUMBER" &&
-      node.operator === "+"
-    ) {
+    if (leftType === "STRING" && rightType === "NUMBER" && operator === "+") {
       const leftValue = (nodeLeft as StringValue).value;
       const rightValue = (nodeRight as NumberValue).value;
-
       return macroString(leftValue + rightValue);
     }
 
@@ -183,17 +186,36 @@ class Interpreter {
     return scope.declareVar(node.identifier, varVal);
   }
 
+  private evaluateAssignmentArray(
+    node: AssignmentExpression,
+    scope: Environment,
+  ): RuntimeValue {
+    const left = node.assignee as IndexExpression;
+    const right = this.evaluate(node.value, scope);
+
+    const arr = this.evaluate(left.array, scope) as ArrayValue;
+    const index = this.evaluate(left.index, scope) as NumberValue;
+
+    if (arr.type !== "ARRAY") throw new Error("Cannot index a non-array.");
+    if (index.type !== "NUMBER")
+      throw new Error("Expected number for array index.");
+
+    arr.value[index.value] = right;
+    return right;
+  }
+
   private evaluateAssignment(
     node: AssignmentExpression,
     scope: Environment,
   ): RuntimeValue {
-    if (node.assignee.type !== "IDENTIFIER")
-      throw new Error("You can only assign values to identifiers.");
+    if (node.assignee.type === "IDENTIFIER") {
+      const varId = (node.assignee as Identifier).exp;
+      const varVal = this.evaluate(node.value, scope);
 
-    const varId = (node.assignee as Identifier).exp;
-    const varVal = this.evaluate(node.value, scope);
-
-    return scope.assignVar(varId, varVal);
+      return scope.assignVar(varId, varVal);
+    } else if (node.assignee.type === "INDEXEXP") {
+      return this.evaluateAssignmentArray(node, scope);
+    } else throw new Error("Invalid assignee on assignment expression.");
   }
 
   private isTruthy(value: RuntimeValue): boolean {
@@ -378,6 +400,31 @@ class Interpreter {
     } as ReturnThrow;
   }
 
+  private evaluateArrayLiteral(
+    node: ArrayLiteral,
+    scope: Environment,
+  ): RuntimeValue {
+    const elements = node.elements.map((element) =>
+      this.evaluate(element, scope),
+    );
+
+    return { type: "ARRAY", value: elements } as ArrayValue;
+  }
+
+  private evaluateIndexExp(
+    node: IndexExpression,
+    scope: Environment,
+  ): RuntimeValue {
+    const arr = this.evaluate(node.array, scope) as ArrayValue;
+    const index = this.evaluate(node.index, scope) as NumberValue;
+
+    if (arr.type !== "ARRAY") throw new Error("Cannot index a non-array.");
+    if (index.type !== "NUMBER")
+      throw new Error("Expected number for array index.");
+
+    return arr.value.at(index.value) ?? macroNull();
+  }
+
   public evaluate(ASTNode: Node, scope: Environment): RuntimeValue {
     switch (ASTNode.type) {
       case "NUMERICLITERAL":
@@ -408,8 +455,15 @@ class Interpreter {
         return this.evaluateFuncCall(ASTNode as FunctionCall, scope);
       case "RETURNSTATEMENT":
         return this.evaluateReturnStatement(ASTNode as ReturnStatement, scope);
+      case "ARRAYLITERAL":
+        return this.evaluateArrayLiteral(ASTNode as ArrayLiteral, scope);
+      case "INDEXEXP":
+        return this.evaluateIndexExp(ASTNode as IndexExpression, scope);
       default:
-        return assertNever(ASTNode.type as never);
+        return assertNever(
+          ASTNode.type as never,
+          "Unexpected value on 'evaluate'",
+        );
     }
   }
 }

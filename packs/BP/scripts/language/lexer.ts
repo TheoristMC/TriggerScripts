@@ -27,6 +27,8 @@ enum TokenType {
   GREATER, // >
   FUNCTION, // func
   RETURN, // back
+  LBRACKET,
+  RBRACKET,
   EOF,
 }
 
@@ -60,6 +62,8 @@ class Tokenize {
     [60, TokenType.LESSER],
     [61, TokenType.EQUALS],
     [62, TokenType.GREATER],
+    [91, TokenType.LBRACKET],
+    [93, TokenType.RBRACKET],
     [123, TokenType.LBRACES],
     [125, TokenType.RBRACES],
   ]);

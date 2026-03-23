@@ -39,8 +39,8 @@ class Environment {
     scope.declareFunc(
       "len",
       macroNativeFunc((args) => {
-        const input = args[0] as StringValue;
-        if (!input || input.type !== "STRING")
+        const input = args[0] as StringValue | undefined;
+        if (input?.type !== "STRING")
           throw new Error("Invalid parameter received at function 'len'");
 
         return macroNumber(input.value.length);
