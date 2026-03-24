@@ -55,6 +55,10 @@ class Parser {
     return token ?? { type: TokenType.EOF };
   }
 
+  private isCurrentTokenType(...types: TokenType[]): boolean {
+    return types.includes(this.currentToken.type);
+  }
+
   // EXPRESSIONS (order matter)
 
   private parseExpression(): Expression {
@@ -64,7 +68,7 @@ class Parser {
   private parseAssignmentExp(): Expression {
     const left = this.parseLogicalOR();
 
-    if (this.currentToken.type === TokenType.EQUALS) {
+    if (this.isCurrentTokenType(TokenType.EQUALS)) {
       this.eatToken();
 
       const value = this.parseAssignmentExp();
@@ -82,7 +86,7 @@ class Parser {
   private parseLogicalOR(): Expression {
     let left = this.parseLogicalAND();
 
-    while (this.currentToken.type === TokenType.OR_OR) {
+    while (this.isCurrentTokenType(TokenType.OR_OR)) {
       const token = this.eatToken();
 
       left = {
@@ -99,7 +103,7 @@ class Parser {
   private parseLogicalAND(): Expression {
     let left = this.parseEqualityExp();
 
-    while (this.currentToken.type === TokenType.AND_AND) {
+    while (this.isCurrentTokenType(TokenType.AND_AND)) {
       const token = this.eatToken();
 
       left = {
@@ -117,8 +121,7 @@ class Parser {
     let left = this.parseComparisonExp();
 
     while (
-      this.currentToken.type === TokenType.EQUAL_EQUAL ||
-      this.currentToken.type === TokenType.BANG_EQUAL
+      this.isCurrentTokenType(TokenType.EQUAL_EQUAL, TokenType.BANG_EQUAL)
     ) {
       const token = this.eatToken();
 
@@ -137,16 +140,18 @@ class Parser {
     let left = this.parseAdditiveExp();
 
     while (
-      this.currentToken.type === TokenType.LESSER ||
-      this.currentToken.type === TokenType.GREATER ||
-      this.currentToken.type === TokenType.LESS_EQUAL ||
-      this.currentToken.type === TokenType.GREAT_EQUAL
+      this.isCurrentTokenType(
+        TokenType.LESSER,
+        TokenType.GREATER,
+        TokenType.LESS_EQUAL,
+        TokenType.GREAT_EQUAL,
+      )
     ) {
-      const token = this.eatToken();
+      const operator = this.eatToken();
 
       left = {
         type: "BINARYEXP",
-        operator: token.value,
+        operator: operator.value,
         left,
         right: this.parseAdditiveExp(),
       } as BinaryExpression;
@@ -158,12 +163,10 @@ class Parser {
   private parseAdditiveExp(): Expression {
     let left = this.parseMultiplicativeExp();
 
-    while (
-      this.currentToken.type === TokenType.PLUS ||
-      this.currentToken.type === TokenType.MINUS
-    ) {
+    while (this.isCurrentTokenType(TokenType.PLUS, TokenType.MINUS)) {
       const operator = this.eatToken();
       const right = this.parseMultiplicativeExp();
+
       left = {
         type: "BINARYEXP",
         left,
@@ -178,10 +181,7 @@ class Parser {
   private parseMultiplicativeExp(): Expression {
     let left = this.parseUnary();
 
-    while (
-      this.currentToken.type === TokenType.DIVIDE ||
-      this.currentToken.type === TokenType.MULTIP
-    ) {
+    while (this.isCurrentTokenType(TokenType.DIVIDE, TokenType.MULTIP)) {
       const operator = this.eatToken();
       const right = this.parseUnary();
       left = {
@@ -198,7 +198,7 @@ class Parser {
   private parseUnary(): Expression {
     const token = this.currentToken;
 
-    if (token.type === TokenType.MINUS || token.type === TokenType.BANG) {
+    if (this.isCurrentTokenType(TokenType.MINUS, TokenType.BANG)) {
       this.eatToken();
 
       return {
@@ -216,9 +216,9 @@ class Parser {
 
     const args = new Array<Expression>();
 
-    while (this.currentToken.type !== TokenType.RPAREN) {
+    while (!this.isCurrentTokenType(TokenType.RPAREN)) {
       args.push(this.parseExpression());
-      if (this.currentToken.type === TokenType.COMMA) this.eatToken();
+      if (this.isCurrentTokenType(TokenType.COMMA)) this.eatToken();
     }
 
     this.expectToken(TokenType.RPAREN, "Expected ')'");
@@ -244,9 +244,9 @@ class Parser {
     let member = this.parsePrimaryExp();
 
     while (true) {
-      if (this.currentToken.type === TokenType.LPAREN) {
+      if (this.isCurrentTokenType(TokenType.LPAREN)) {
         member = this.parseFuncCall(member);
-      } else if (this.currentToken.type === TokenType.LBRACKET) {
+      } else if (this.isCurrentTokenType(TokenType.LBRACKET)) {
         member = this.parseArrCall(member);
       } else break;
     }
@@ -277,17 +277,20 @@ class Parser {
       case TokenType.EOF:
         throw new Error("Unexpected end of input.");
       default:
-        return assertNever(token.type as never, "Unexpected value on 'parsePrimaryExp'");
+        return assertNever(
+          token.type as never,
+          "Unexpected value on 'parsePrimaryExp'",
+        );
     }
   }
 
   private parseArrayLiteral(): Expression {
     const elements = new Array<Expression>();
 
-    while (this.currentToken.type !== TokenType.RBRACKET) {
+    while (!this.isCurrentTokenType(TokenType.RBRACKET)) {
       elements.push(this.parseExpression());
 
-      if (this.currentToken.type === TokenType.COMMA) {
+      if (this.isCurrentTokenType(TokenType.COMMA)) {
         if (this.peekToken().type === TokenType.RBRACKET)
           throw new Error("Expected an expression after a comma.");
 
@@ -310,7 +313,7 @@ class Parser {
 
     const nodes = new Array<Node>();
 
-    while (this.currentToken.type !== TokenType.RBRACES) {
+    while (!this.isCurrentTokenType(TokenType.RBRACES)) {
       nodes.push(this.parseNodes());
     }
 
@@ -327,7 +330,7 @@ class Parser {
       "Expected variable name after variable declaration.",
     ).value;
 
-    if (this.currentToken.type === TokenType.SEMICOL) {
+    if (this.isCurrentTokenType(TokenType.SEMICOL)) {
       this.eatToken();
       return { type: "VARIABLEDECLAR", identifier } as VariableDeclaration;
     }
@@ -366,7 +369,7 @@ class Parser {
     const thenBranch = this.parseBlock();
 
     let elseBranch: Node[] | undefined;
-    if (this.currentToken.type === TokenType.ELSE) {
+    if (this.isCurrentTokenType(TokenType.ELSE)) {
       this.eatToken();
 
       elseBranch = this.parseBlock();
@@ -395,14 +398,14 @@ class Parser {
 
     const params = new Array<string>();
 
-    while (this.currentToken.type !== TokenType.RPAREN) {
+    while (!this.isCurrentTokenType(TokenType.RPAREN)) {
       const param = this.expectToken(
         TokenType.IDENTIFIER,
         "Expected function parameter or ')'",
       ).value;
 
       if (param) params.push(param);
-      if (this.currentToken.type === TokenType.COMMA) {
+      if (this.isCurrentTokenType(TokenType.COMMA)) {
         if (this.peekToken().type !== TokenType.IDENTIFIER)
           throw new Error("Expected function parameter after a comma.");
 
@@ -426,7 +429,7 @@ class Parser {
     this.eatToken(); // Eat return statement declaration
 
     let value: Expression | undefined;
-    if (this.currentToken.type !== TokenType.SEMICOL) {
+    if (!this.isCurrentTokenType(TokenType.SEMICOL)) {
       value = this.parseExpression();
     }
 

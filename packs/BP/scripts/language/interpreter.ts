@@ -39,6 +39,48 @@ import { TokenType } from "./lexer";
 import Environment from "./env";
 
 class Interpreter {
+  private isEqual(a: RuntimeValue, b: RuntimeValue): boolean {
+    if (a.type !== b.type) return false;
+
+    if (a.type === "BOOLEAN" || a.type === "STRING" || a.type === "NUMBER") {
+      return (
+        (a as BooleanValue | StringValue | NumberValue).value ===
+        (b as BooleanValue | StringValue | NumberValue).value
+      );
+    }
+
+    return a.type === "NULL";
+  }
+
+  private isTruthy(value: RuntimeValue): boolean {
+    switch (value.type) {
+      case "BOOLEAN":
+        return (value as BooleanValue).value;
+      case "NUMBER":
+        return (value as NumberValue).value !== 0;
+      case "NULL":
+        return false;
+      case "STRING":
+        return (value as StringValue).value.length !== 0;
+      default:
+        return true;
+    }
+  }
+
+  private executeBlock(nodes: Node[], parentScope: Environment): RuntimeValue {
+    const scope = new Environment(parentScope);
+
+    let last: RuntimeValue = macroNull();
+
+    for (const node of nodes) {
+      last = this.evaluate(node, scope);
+    }
+
+    return last;
+  }
+
+  // Node Evaluators
+
   private evaluateProgram(program: Program, scope: Environment): RuntimeValue {
     let lastEvaluatedNode: RuntimeValue = macroNull();
 
@@ -49,125 +91,55 @@ class Interpreter {
     return lastEvaluatedNode;
   }
 
-  private evaluateBinaryExpNum(
-    left: NumberValue,
-    right: NumberValue,
-    operator: string,
-  ): NumberValue {
-    const leftValue = left.value;
-    const rightValue = right.value;
-
-    switch (operator) {
-      case "+":
-        return macroNumber(leftValue + rightValue);
-      case "-":
-        return macroNumber(leftValue - rightValue);
-      case "/": {
-        if (rightValue === 0) throw new Error("You cannot divide by zero.");
-        return macroNumber(leftValue / rightValue);
-      }
-      case "*":
-        return macroNumber(leftValue * rightValue);
-      default:
-        return assertNever(
-          operator as never,
-          "Unexpected value on 'evaluateBinaryExpNum'",
-        );
-    }
-  }
-
-  private evaluateBinaryExpStr(
-    left: StringValue,
-    right: StringValue,
-    operator: string,
-  ): StringValue {
-    const leftValue = left.value;
-    const rightValue = right.value;
-
-    switch (operator) {
-      case "+":
-        return macroString(leftValue + rightValue);
-      case "-":
-        return macroString(leftValue.replaceAll(rightValue, ""));
-      default:
-        return assertNever(
-          operator as never,
-          "Unexpected value on 'evaluateBinaryExpStr'",
-        );
-    }
-  }
-
-  private evaluateComparisonExp(
-    left: NumberValue,
-    right: NumberValue,
-    operator: string,
-  ): BooleanValue {
-    const leftValue = left.value;
-    const rightValue = right.value;
-
-    switch (operator) {
-      case ">":
-        return macroBoolean(leftValue > rightValue);
-      case "<":
-        return macroBoolean(leftValue < rightValue);
-      case "<=":
-        return macroBoolean(leftValue <= rightValue);
-      case ">=":
-        return macroBoolean(leftValue >= rightValue);
-      default:
-        return macroBoolean(false);
-    }
-  }
-
   private evaluateBinaryExp(
     node: BinaryExpression,
     scope: Environment,
   ): RuntimeValue {
-    const nodeLeft = this.evaluate(node.left, scope);
-    const nodeRight = this.evaluate(node.right, scope);
+    const left = this.evaluate(node.left, scope) as StringValue | NumberValue;
+    const right = this.evaluate(node.right, scope) as StringValue | NumberValue;
     const operator = node.operator;
-    const leftType = nodeLeft.type;
-    const rightType = nodeRight.type;
 
-    // Comparison (higher precedence)
-    if (leftType === "NUMBER" && rightType === "NUMBER") {
-      if (
-        operator === "<" ||
-        operator === ">" ||
-        operator === "<=" ||
-        operator === ">="
-      ) {
-        return this.evaluateComparisonExp(
-          nodeLeft as NumberValue,
-          nodeRight as NumberValue,
-          operator,
-        );
-      }
-      // Numeric operations
-      return this.evaluateBinaryExpNum(
-        nodeLeft as NumberValue,
-        nodeRight as NumberValue,
-        operator,
-      );
+    const bothNumbers = left.type === "NUMBER" && right.type === "NUMBER";
+
+    switch (operator) {
+      case "+":
+        if (bothNumbers) return macroNumber(left.value + right.value);
+        return macroString(String(left.value) + String(right.value));
+
+      case "-":
+        if (bothNumbers) return macroNumber(left.value - right.value);
+        break;
+
+      case "*":
+        if (bothNumbers) return macroNumber(left.value * right.value);
+        break;
+
+      case "/":
+        if (bothNumbers) return macroNumber(left.value / right.value);
+        break;
+
+      case ">":
+      case "<":
+      case "<=":
+      case ">=":
+        if (bothNumbers) {
+          switch (operator) {
+            case ">":
+              return macroBoolean(left.value > right.value);
+            case "<":
+              return macroBoolean(left.value < right.value);
+            case "<=":
+              return macroBoolean(left.value <= right.value);
+            case ">=":
+              return macroBoolean(left.value >= right.value);
+          }
+        }
+        break;
     }
 
-    // Strings
-    if (leftType === "STRING" && rightType === "STRING") {
-      return this.evaluateBinaryExpStr(
-        nodeLeft as StringValue,
-        nodeRight as StringValue,
-        operator,
-      );
-    }
-
-    // Mixed Types Addition
-    if (leftType === "STRING" && rightType === "NUMBER" && operator === "+") {
-      const leftValue = (nodeLeft as StringValue).value;
-      const rightValue = (nodeRight as NumberValue).value;
-      return macroString(leftValue + rightValue);
-    }
-
-    return macroNull();
+    throw new Error(
+      `Invalid operation: ${left.type} ${operator} ${right.type}`,
+    );
   }
 
   private evaluateIdentifier(
@@ -216,33 +188,6 @@ class Interpreter {
     } else if (node.assignee.type === "INDEXEXP") {
       return this.evaluateAssignmentArray(node, scope);
     } else throw new Error("Invalid assignee on assignment expression.");
-  }
-
-  private isTruthy(value: RuntimeValue): boolean {
-    switch (value.type) {
-      case "BOOLEAN":
-        return (value as BooleanValue).value;
-      case "NUMBER":
-        return (value as NumberValue).value !== 0;
-      case "NULL":
-        return false;
-      case "STRING":
-        return (value as StringValue).value.length !== 0;
-      default:
-        return true;
-    }
-  }
-
-  private executeBlock(nodes: Node[], parentScope: Environment): RuntimeValue {
-    const scope = new Environment(parentScope);
-
-    let last: RuntimeValue = macroNull();
-
-    for (const node of nodes) {
-      last = this.evaluate(node, scope);
-    }
-
-    return last;
   }
 
   private evaluateIfStatement(
@@ -294,24 +239,6 @@ class Interpreter {
     return macroNull();
   }
 
-  private isEqual(a: RuntimeValue, b: RuntimeValue): boolean {
-    if (a.type !== b.type) return false;
-
-    switch (a.type) {
-      case "BOOLEAN":
-      case "STRING":
-      case "NUMBER":
-        return (
-          (a as BooleanValue | StringValue | NumberValue).value ===
-          (b as BooleanValue | StringValue | NumberValue).value
-        );
-      case "NULL":
-        return true;
-      default:
-        return false;
-    }
-  }
-
   private evaluateEqualityExp(
     node: EqualityExpression,
     scope: Environment,
@@ -332,7 +259,7 @@ class Interpreter {
     node: FunctionDeclaration,
     env: Environment,
   ): RuntimeValue {
-    env.declareFunc(
+    return env.declareFunc(
       node.name,
       {
         type: "FUNCTION",
@@ -342,8 +269,6 @@ class Interpreter {
       } as FunctionValue,
       false,
     );
-
-    return macroNull();
   }
 
   private evaluateFuncCall(node: FunctionCall, env: Environment): RuntimeValue {

@@ -49,7 +49,9 @@ class Tokenize {
   private tokens = new Array<Token>();
   private pos = 0;
 
-  private symbols = new Map<number, TokenType>([
+  private static SINGLE_QUOTE = 39;
+
+  private static symbols = new Map<number, TokenType>([
     [33, TokenType.BANG],
     [40, TokenType.LPAREN],
     [41, TokenType.RPAREN],
@@ -68,7 +70,7 @@ class Tokenize {
     [125, TokenType.RBRACES],
   ]);
 
-  private multiSymbols = new Map<string, TokenType>([
+  private static multiSymbols = new Map<string, TokenType>([
     ["==", TokenType.EQUAL_EQUAL],
     ["!=", TokenType.BANG_EQUAL],
     ["&&", TokenType.AND_AND],
@@ -99,30 +101,28 @@ class Tokenize {
 
   run(): Token[] {
     while (this.pos < this.code.length) {
-      const charCode = (pos = this.pos) => this.code.charCodeAt(pos);
+      const curr = this.code.charCodeAt(this.pos);
 
-      if (this.isIgnored(charCode())) {
+      if (this.isIgnored(curr)) {
         this.pos++;
         continue;
       }
 
       // Number
-      if (this.isDigit(charCode())) {
-        let num = "";
+      if (this.isDigit(curr)) {
+        const startPos = this.pos;
         let hasDot = false;
 
         while (this.pos < this.code.length) {
-          const char = this.code[this.pos];
+          const currCode = this.code.charCodeAt(this.pos);
 
-          if (this.isDigit(charCode(this.pos))) {
-            num += char;
+          if (this.isDigit(currCode)) {
             this.pos++;
             continue;
           }
 
-          if (char === "." && !hasDot) {
+          if (this.code[this.pos] === "." && !hasDot) {
             hasDot = true;
-            num += char;
             this.pos++;
             continue;
           }
@@ -130,23 +130,26 @@ class Tokenize {
           break;
         }
 
-        this.tokens.push({ type: TokenType.NUMBER, value: num });
+        this.tokens.push({
+          type: TokenType.NUMBER,
+          value: this.code.slice(startPos, this.pos),
+        });
 
         continue;
       }
 
       // Identifier
-      if (this.isAlpha(charCode())) {
-        let id = "";
+      if (this.isAlpha(curr)) {
+        const startPos = this.pos;
 
         while (
           this.pos < this.code.length &&
-          this.isAlphaNumeric(charCode(this.pos))
+          this.isAlphaNumeric(this.code.charCodeAt(this.pos))
         ) {
-          id += this.code.charAt(this.pos);
           this.pos++;
         }
 
+        const id = this.code.slice(startPos, this.pos);
         const keywordsType = KEYWORDS[id as keyof typeof KEYWORDS];
 
         if (keywordsType !== undefined) {
@@ -159,19 +162,21 @@ class Tokenize {
       }
 
       // Strings
-      if (charCode() === 39) {
+      if (curr === Tokenize.SINGLE_QUOTE) {
         this.pos++; // Skip open quote
+        const startPos = this.pos;
 
-        let str = "";
-
-        while (this.pos < this.code.length && charCode(this.pos) !== 39) {
-          str += this.code[this.pos];
+        while (
+          this.pos < this.code.length &&
+          this.code.charCodeAt(this.pos) !== Tokenize.SINGLE_QUOTE
+        ) {
           this.pos++;
         }
 
         if (this.pos >= this.code.length)
           throw new Error("Unterminated string.");
 
+        const str = this.code.slice(startPos, this.pos);
         this.pos++; // Skip close quote
 
         this.tokens.push({ type: TokenType.STRING, value: str });
@@ -180,16 +185,21 @@ class Tokenize {
       }
 
       // Multiple Symbols
-      const twoCharacters = this.code[this.pos] + this.code[this.pos + 1];
-      const multiSymbol = this.multiSymbols.get(twoCharacters);
-      if (multiSymbol) {
-        this.tokens.push({ type: multiSymbol, value: twoCharacters } as Token);
-        this.pos += 2;
-        continue;
+      if (this.pos + 1 < this.code.length) {
+        const twoCharacters = this.code[this.pos] + this.code[this.pos + 1];
+        const multiSymbol = Tokenize.multiSymbols.get(twoCharacters);
+        if (multiSymbol) {
+          this.tokens.push({
+            type: multiSymbol,
+            value: twoCharacters,
+          } as Token);
+          this.pos += 2;
+          continue;
+        }
       }
 
       // Singular Symbols
-      const supportedSymbol = this.symbols.get(charCode());
+      const supportedSymbol = Tokenize.symbols.get(curr);
       if (supportedSymbol) {
         this.tokens.push({
           type: supportedSymbol,

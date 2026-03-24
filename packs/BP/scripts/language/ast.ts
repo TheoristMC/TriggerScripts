@@ -1,6 +1,6 @@
 import { TokenType } from "./lexer";
 
-type NodeTypes =
+type NodeType =
   // STATEMENTS
   | "PROGRAM"
   | "VARIABLEDECLAR"
@@ -20,8 +20,10 @@ type NodeTypes =
   | "BINARYEXP"
   | "IDENTIFIER";
 
+type Operator = "+" | "-" | "*" | "/" | "<" | ">" | ">=" | "<=";
+
 interface Node {
-  type: NodeTypes;
+  type: NodeType;
 }
 
 interface Program extends Node {
@@ -102,7 +104,7 @@ interface BinaryExpression extends Expression {
   type: "BINARYEXP";
   left: Expression;
   right: Expression;
-  operator: string;
+  operator: Operator;
 }
 
 interface UnaryExpression extends Expression {
@@ -122,7 +124,8 @@ interface NumericLiteral extends Expression {
 }
 
 export {
-  NodeTypes,
+  NodeType,
+  Operator,
   // STATEMENTS
   Node,
   Program,
